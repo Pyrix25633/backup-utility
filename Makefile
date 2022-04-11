@@ -9,7 +9,7 @@ default:
 > make run
 
 build:
-> $(CC) src/main.cpp -o bin/$(NAME)-$(VERSION)
+> $(CC) src/main.cpp -std=c++17 -o bin/$(NAME)-$(VERSION)
 
 run:
-> ./bin/$(NAME)-$(VERSION)
+> ./bin/$(NAME)-$(VERSION) test/src test/dst
