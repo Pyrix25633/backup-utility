@@ -22,36 +22,45 @@ struct DirectoryEntry {
     string path;
 };
 
-bool search(filesystem::directory_entry entry, vector<filesystem::directory_entry> vector, Uint32 &pos);
+string getPath(filesystem::directory_entry entry, string from);
+bool search(DirectoryEntry entry, vector<DirectoryEntry> vector, Uint32 &pos);
 
 int main(int argc, char* argv[]) {
     ofstream log("log.txt");
     if(argc < 3) return 1;
     string src = argv[1], dst = argv[2];
-    vector<filesystem::directory_entry> allFilesNow, allFilesBefore, toCopyFiles, toRemoveFiles;
+    vector<DirectoryEntry> allFilesNow, allFilesBefore, toCopyFiles, toRemoveFiles;
     Uint32 size, pos;
 
     while(true) {
         for(filesystem::directory_entry entry : filesystem::recursive_directory_iterator(src)) {
-            allFilesNow.push_back(entry);
-            log << "Found source: " << entry.path() << endl;
+            DirectoryEntry e;
+            e.entry = entry;
+            e.path = getPath(entry, src);
+            allFilesNow.push_back(e);
+            log << "Found source: " << e.path << endl;
         }
         for(filesystem::directory_entry entry : filesystem::recursive_directory_iterator(dst)) {
-            allFilesBefore.push_back(entry);
-            log << "Found destination: " << entry.path() << endl;
+            DirectoryEntry e;
+            e.entry = entry;
+            e.path = getPath(entry, dst);
+            allFilesBefore.push_back(e);
+            log << "Found destination: " << e.path << endl;
         }
         //Files to copy
         size = allFilesNow.size();
         for(Uint32 i = 0; i < size; i++) {
             if(!search(allFilesNow[i], allFilesBefore, pos)) {
                 toCopyFiles.push_back(allFilesNow[i]);
-                log << "To copy because not there: " << allFilesNow[i].path() << endl;
+                log << "To copy because not there: " << allFilesNow[i].path << endl;
             }
-            else if(!allFilesNow[i].is_directory()) {
-                if(allFilesNow[i].file_size() != allFilesBefore[pos].file_size()
-                    || allFilesNow[i].last_write_time() != allFilesBefore[pos].last_write_time()) {
+            else if(!allFilesNow[i].entry.is_directory()) {
+                if(allFilesNow[i].entry.file_size() != allFilesBefore[pos].entry.file_size()) {
                     toCopyFiles.push_back(allFilesNow[i]);
-                    log << "To copy because different size or date: " << allFilesNow[i].path() << endl;
+                    log << "To copy because different size: " << allFilesNow[i].path << endl;
+                }
+                else if(allFilesNow[i].entry.last_write_time() != allFilesBefore[pos].entry.last_write_time()) {
+                    log << "To copy because different date: " << allFilesNow[i].path << endl;
                 }
             }
         }
@@ -60,7 +69,7 @@ int main(int argc, char* argv[]) {
         for(Uint32 i = 0; i < size; i++) {
             if(!search(allFilesBefore[i], allFilesNow, pos)) {
                 toRemoveFiles.push_back(allFilesBefore[i]);
-                log << "To remove: " << allFilesBefore[i].path() << endl;
+                log << "To remove: " << allFilesBefore[i].path << endl;
             }
         }
         cout << "Check is finished" << endl;
@@ -75,13 +84,20 @@ int main(int argc, char* argv[]) {
     return 0;
 }
 
-bool search(filesystem::directory_entry entry, vector<filesystem::directory_entry> vector, Uint32 &pos) {
+bool search(DirectoryEntry entry, vector<DirectoryEntry> vector, Uint32 &pos) {
     Uint32 size = vector.size();
     for(Uint32 i = 0; i < size; i++) {
-        if(entry.path() == vector[i].path()) {
+        if(entry.path == vector[i].path) {
             pos = i;
             return true;
         }
     }
     return false;
+}
+
+string getPath(filesystem::directory_entry entry, string from) {
+    string path;
+    path = entry.path();
+    path = path.replace(0, from.size() + 1, "");
+    return path;
 }
