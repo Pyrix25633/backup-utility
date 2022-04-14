@@ -132,6 +132,7 @@ int main(int argc, char* argv[]) {
                 try {
                     filesystem::copy(toCopyFiles[i].entry.path(), dstPath, copyOptions);
                     log << "Copied folder: " << toCopyFiles[i].path << endl;
+                    cout << "Copied folder: " << toCopyFiles[i].path << endl;
                     cpdFiles++;
                 }
                 catch(exception e) {}
@@ -141,12 +142,14 @@ int main(int argc, char* argv[]) {
                 try {
                     filesystem::copy_file(toCopyFiles[i].entry.path(), dstPath, copyOptions);
                     log << "Copied file: " << toCopyFiles[i].path << endl;
+                    cout << "Copied file: " << toCopyFiles[i].path << endl;
                     cpdFiles++;
                 }
                 catch(exception e) {
                     filesystem::remove(dstPath);
                     filesystem::copy_file(toCopyFiles[i].entry.path(), dstPath, copyOptions);
                     log << "Copied file: " << toCopyFiles[i].path << endl;
+                    cout << "Copied file: " << toCopyFiles[i].path << endl;
                     cpdFiles++;
                 }
             }
@@ -157,18 +160,24 @@ int main(int argc, char* argv[]) {
             filesystem::path rmvPath(rmv + dirSep + toRemoveFiles[i].path);
             try {
                 filesystem::rename(toRemoveFiles[i].entry.path(), rmvPath);
+                log << "Removed file: " << toRemoveFiles[i].path << endl;
+                cout << "Removed file: " << toRemoveFiles[i].path << endl;
                 rmvdFiles++;
             }
             catch(exception e) {
                 try {
                     filesystem::remove(rmvPath);
                     filesystem::rename(toRemoveFiles[i].entry.path(), rmvPath);
+                    log << "Removed file: " << toRemoveFiles[i].path << endl;
+                    cout << "Removed file: " << toRemoveFiles[i].path << endl;
                     rmvdFiles++;
                 }
                 catch(exception e) {
                     filesystem::path dirPath(getDirectory(rmv + dirSep + toRemoveFiles[i].path));
                     filesystem::create_directories(dirPath);
                     filesystem::rename(toRemoveFiles[i].entry.path(), rmvPath);
+                    log << "Removed file: " << toRemoveFiles[i].path << endl;
+                    cout << "Removed file: " << toRemoveFiles[i].path << endl;
                     rmvdFiles++;
                 }
             }
