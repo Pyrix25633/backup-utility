@@ -16,15 +16,14 @@
             "name": "Win32",
             "includePath": [
                 "${workspaceFolder}/**",
-                "${workspaceFolder}/include/**",
-                "${workspaceFolder}/libs/**",
-                "${workspaceFolder}/libs/SDL2/include/**"
+                "C:/C++/msys64/mingw64/include/**"
             ],
             "defines": [],
-            "compilerPath": "C:/C++/mingw64/bin/g++.exe",
+            "compilerPath": "C:/C++/msys64/mingw64/bin/g++.exe",
             "cStandard": "c17",
             "cppStandard": "c++20",
-            "intelliSenseMode": "gcc-x64"
+            "intelliSenseMode": "gcc-x64",
+            "configurationProvider": "ms-vscode.cpptools"
         }
     ],
     "version": 4
