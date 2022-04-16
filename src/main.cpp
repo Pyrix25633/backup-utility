@@ -223,9 +223,11 @@ int main(int argc, char* argv[]) {
             }
         }
 
-        cout << "Operation completed, " << cpdFiles << " files copied, " << rmvdFiles << " files removed"<< endl;
+        cout << "Operation completed, " << cpdFiles << " file" << ((cpdFiles == 1) ? "" : "s") << " copied, "
+            << rmvdFiles << " file" << ((rmvdFiles == 1) ? "" : "s") << " removed"<< endl;
         cout << "Waiting " << time << " seconds from now, process can be terminated with 'Ctrl + C' before the next scan" << endl;
-        log << "Operation completed, " << cpdFiles << " files copied, " << rmvdFiles << " files removed"<< endl;
+        log << "Operation completed, " << cpdFiles << " file" << ((cpdFiles == 1) ? "" : "s") << " copied, "
+            << rmvdFiles << " file" << ((rmvdFiles == 1) ? "" : "s") << " removed"<< endl;
 
         allFilesNow.clear();
         allFilesBefore.clear();
