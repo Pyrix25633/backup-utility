@@ -30,15 +30,18 @@ bool search(DirectoryEntry &entry, vector<DirectoryEntry> &vector, Uint32 &pos);
 string getPath(filesystem::path entryPath, string &from);
 string getDirectory(string path);
 bool compareFiles(filesystem::path path1, filesystem::path path2);
+bool isInExtensionsList(string path, vector<string> extensionsList);
 
 int main(int argc, char* argv[]) {
     ofstream log("log.txt");
     if(argc < 3) return 1;
-    string src = "", dst = "", rmv = "";
+    string src = "", dst = "", rmv = "", ext = "";
     vector<DirectoryEntry> allFilesNow, allFilesBefore, toCopyFiles, toRemoveFiles;
+    vector<string> extensionsList;
     Uint32 size, pos, time = 0, cpdFiles = 0, rmvdFiles = 0;
     filesystem::copy_options copyOptions = filesystem::copy_options::overwrite_existing
         | filesystem::copy_options::recursive | filesystem::copy_options::directories_only;
+    bool fError = false;
 
     for(Uint8 i = 1; i < argc; i++) {
         string s = argv[i];
@@ -53,6 +56,10 @@ int main(int argc, char* argv[]) {
         else if(s == "-r") {
             rmv = argv[i + 1];
             cout << "Folder for removed files: " << rmv << endl;
+        }
+        else if(s == "-e") {
+            ext = argv[i + 1];
+            cout << "File with list of extensions to check for content changes: " << ext << endl;
         }
         else if(s == "-t") {
             time = stoi(argv[i + 1]);
@@ -81,75 +88,105 @@ int main(int argc, char* argv[]) {
         return 0;
     }
 
+    if(ext != "") {
+        ifstream extensionsFile(ext);
+        char cs[20];
+        while(!extensionsFile.eof()) {
+            extensionsFile.getline(cs, 20);
+            extensionsList.push_back(cs);
+        }
+    }
+
     while(true) {
-        log << "Files in source folder:" << endl;
+        cout << "Starting scan..." << endl;
+        log << "Starting scan..." << endl;
         for(filesystem::directory_entry entry : filesystem::recursive_directory_iterator(src)) {
             DirectoryEntry e;
             e.entry = entry;
             e.path = getPath(entry.path(), src);
             allFilesNow.push_back(e);
-            log << "\t" << e.path << endl;
         }
-        log << "Files in destination folder:" << endl;
+        cout << "Source directory scanned" << endl;
+        log << "Source directory scanned" << endl;
         for(filesystem::directory_entry entry : filesystem::recursive_directory_iterator(dst)) {
             DirectoryEntry e;
             e.entry = entry;
             e.path = getPath(entry.path(), dst);
             allFilesBefore.push_back(e);
-            log << "\t" << e.path << endl;
         }
+        cout << "Destination directory scanned, comparing the two lists..." << endl;
+        log << "Destination directory scanned, comparing the two lists..." << endl;
         //Files to copy
         size = allFilesNow.size();
         for(Uint32 i = 0; i < size; i++) {
-            if(!search(allFilesNow[i], allFilesBefore, pos)) {
-                toCopyFiles.push_back(allFilesNow[i]);
-                log << "To copy because not there: " << allFilesNow[i].path << endl;
+            DirectoryEntry e = allFilesNow[i];
+            if(!search(e, allFilesBefore, pos)) {
+                toCopyFiles.push_back(e);
+                cout << "\tTo copy because not there: " << e.path << endl;
+                log << "\tTo copy because not there: " << e.path << endl;
             }
-            else if(!allFilesNow[i].entry.is_directory()) {
-                if(allFilesNow[i].entry.file_size() != allFilesBefore[pos].entry.file_size()) {
-                    toCopyFiles.push_back(allFilesNow[i]);
-                    log << "To copy because different size: " << allFilesNow[i].path << endl;
+            else if(!e.entry.is_directory()) {
+                if(e.entry.file_size() != allFilesBefore[pos].entry.file_size()) {
+                    toCopyFiles.push_back(e);
+                    cout << "\tTo copy because different size: " << e.path << endl;
+                    log << "\tTo copy because different size: " << e.path << endl;
                 }
-                else if(!compareFiles(allFilesNow[i].entry.path(), allFilesBefore[pos].entry.path())) {
-                    toCopyFiles.push_back(allFilesNow[i]);
-                    log << "To copy because different content: " << allFilesNow[i].path << endl;
+                else if(isInExtensionsList(e.path, extensionsList)) {
+                    if(!compareFiles(e.entry.path(), allFilesBefore[pos].entry.path())) {
+                        toCopyFiles.push_back(e);
+                        cout << "\tTo copy because different content: " << e.path << endl;
+                        log << "\tTo copy because different content: " << e.path << endl;
+                    }
                 }
             }
         }
         //Files to delete
         size = allFilesBefore.size();
         for(Uint32 i = 0; i < size; i++) {
-            if(!search(allFilesBefore[i], allFilesNow, pos)) {
-                toRemoveFiles.push_back(allFilesBefore[i]);
-                log << "To remove: " << allFilesBefore[i].path << endl;
+            DirectoryEntry e = allFilesBefore[i];
+            if(!search(e, allFilesNow, pos)) {
+                toRemoveFiles.push_back(e);
+                cout << "\tTo remove: " << e.path << endl;
+                log << "\tTo remove: " << e.path << endl;
             }
         }
+        cout << "Lists compared, starting copy-delete operation..." << endl;
+        log << "Lists compared, starting copy-delete operation..." << endl;
         //Copy files
         size = toCopyFiles.size();
         for(Uint32 i = 0; i < size; i++) {
-            if(toCopyFiles[i].entry.is_directory()) { //Copy directory
-                filesystem::path dstPath(dst + dirSep + toCopyFiles[i].path);
+            DirectoryEntry e = toCopyFiles[i];
+            if(e.entry.is_directory()) { //Copy directory
+                filesystem::path dstPath(dst + dirSep + e.path);
                 try {
-                    filesystem::copy(toCopyFiles[i].entry.path(), dstPath, copyOptions);
-                    log << "Copied folder: " << toCopyFiles[i].path << endl;
-                    cout << "Copied folder: " << toCopyFiles[i].path << endl;
+                    filesystem::copy(e.entry.path(), dstPath, copyOptions);
+                    fError = false;
+                }
+                catch(exception ex) {fError = true;}
+                if(!fError) {
+                    log << "\tCopied folder: " << e.path << endl;
+                    cout << "\tCopied folder: " << e.path << endl;
                     cpdFiles++;
                 }
-                catch(exception e) {}
             }
             else { //Copy file
-                filesystem::path dstPath(dst + dirSep + toCopyFiles[i].path);
+                filesystem::path dstPath(dst + dirSep + e.path);
                 try {
-                    filesystem::copy_file(toCopyFiles[i].entry.path(), dstPath, copyOptions);
-                    log << "Copied file: " << toCopyFiles[i].path << endl;
-                    cout << "Copied file: " << toCopyFiles[i].path << endl;
-                    cpdFiles++;
+                    filesystem::copy_file(e.entry.path(), dstPath, copyOptions);
+                    fError = false;
                 }
-                catch(exception e) {
-                    filesystem::remove(dstPath);
-                    filesystem::copy_file(toCopyFiles[i].entry.path(), dstPath, copyOptions);
-                    log << "Copied file: " << toCopyFiles[i].path << endl;
-                    cout << "Copied file: " << toCopyFiles[i].path << endl;
+                catch(exception ex) {
+                    try {
+                        filesystem::remove(dstPath);
+                        filesystem::copy_file(e.entry.path(), dstPath, copyOptions);
+                        fError = false;
+                    }
+                    catch(exception ex) {fError = true;}
+                    
+                }
+                if(!fError) {
+                    log << "\tCopied file: " << e.path << endl;
+                    cout << "\tCopied file: " << e.path << endl;
                     cpdFiles++;
                 }
             }
@@ -157,33 +194,38 @@ int main(int argc, char* argv[]) {
         //Remove files
         size = toRemoveFiles.size();
         for(Uint32 i = 0; i < size; i++) {
-            filesystem::path rmvPath(rmv + dirSep + toRemoveFiles[i].path);
+            DirectoryEntry e = toRemoveFiles[i];
+            filesystem::path rmvPath(rmv + dirSep + e.path);
             try {
-                filesystem::rename(toRemoveFiles[i].entry.path(), rmvPath);
-                log << "Removed file: " << toRemoveFiles[i].path << endl;
-                cout << "Removed file: " << toRemoveFiles[i].path << endl;
-                rmvdFiles++;
+                filesystem::rename(e.entry.path(), rmvPath);
+                fError = false;
             }
-            catch(exception e) {
+            catch(exception ex) {
                 try {
                     filesystem::remove(rmvPath);
-                    filesystem::rename(toRemoveFiles[i].entry.path(), rmvPath);
-                    log << "Removed file: " << toRemoveFiles[i].path << endl;
-                    cout << "Removed file: " << toRemoveFiles[i].path << endl;
-                    rmvdFiles++;
+                    filesystem::rename(e.entry.path(), rmvPath);
+                    fError = false;
                 }
-                catch(exception e) {
-                    filesystem::path dirPath(getDirectory(rmv + dirSep + toRemoveFiles[i].path));
-                    filesystem::create_directories(dirPath);
-                    filesystem::rename(toRemoveFiles[i].entry.path(), rmvPath);
-                    log << "Removed file: " << toRemoveFiles[i].path << endl;
-                    cout << "Removed file: " << toRemoveFiles[i].path << endl;
-                    rmvdFiles++;
+                catch(exception ex) {
+                    try {
+                        filesystem::path dirPath(getDirectory(rmv + dirSep + e.path));
+                        filesystem::create_directories(dirPath);
+                        filesystem::rename(e.entry.path(), rmvPath);
+                        fError = false;
+                    }
+                    catch(exception ex) {fError = true;}
                 }
+            }
+            if(!fError) {
+                log << "\tRemoved file: " << e.path << endl;
+                cout << "\tRemoved file: " << e.path << endl;
+                rmvdFiles++;
             }
         }
 
-        cout << "Check is finished, " << cpdFiles << " files copied, " << rmvdFiles << " files removed."<< endl;
+        cout << "Operation completed, " << cpdFiles << " files copied, " << rmvdFiles << " files removed"<< endl;
+        cout << "Waiting " << time << " seconds from now, process can be terminated with 'Ctrl + C' before the next scan" << endl;
+        log << "Operation completed, " << cpdFiles << " files copied, " << rmvdFiles << " files removed"<< endl;
 
         allFilesNow.clear();
         allFilesBefore.clear();
@@ -238,4 +280,31 @@ bool compareFiles(filesystem::path path1, filesystem::path path2) {
     return equal(istreambuf_iterator<char>(file1.rdbuf()),
         istreambuf_iterator<char>(),
         istreambuf_iterator<char>(file2.rdbuf()));
+}
+
+bool isInExtensionsList(string path, vector<string> extensionsList) {
+    Int32 pos0 = -1, pos1 = 0;
+    Uint8 size = extensionsList.size();
+    string extension;
+    while(pos1 != string::npos) {
+        pos1 = path.find(dirSep, pos0 + 1);
+        if(pos1 != string::npos) {
+            pos0 = pos1;
+        }
+    }
+    path = path.substr(pos0 + 1);
+    pos0 = -1, pos1 = 0;
+    while(pos1 != string::npos) {
+        pos1 = path.find('.', pos0 + 1);
+        if(pos1 != string::npos) {
+            pos0 = pos1;
+        }
+    }
+    extension = path.substr(pos0 + 1);
+    for(Uint8 i = 0; i < size; i++) {
+        if(extensionsList[i] == extension) {
+            return true;
+        }
+    }
+    return false;
 }

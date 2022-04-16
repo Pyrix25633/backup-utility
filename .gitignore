@@ -2,3 +2,4 @@ bin/
 *.o
 test/
 log.txt
+extensions.txt
