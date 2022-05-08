@@ -41,7 +41,10 @@ int main(int argc, char* argv[]) {
     Uint32 size, pos, time = 0, cpdFiles = 0, rmvdFiles = 0;
     filesystem::copy_options copyOptions = filesystem::copy_options::overwrite_existing
         | filesystem::copy_options::recursive | filesystem::copy_options::directories_only;
+    string version = "1.0.0";
     bool fError = false;
+
+    cout << "Backup Utility version " << version << endl;
 
     for(Uint8 i = 1; i < argc; i++) {
         string s = argv[i];
@@ -106,16 +109,18 @@ int main(int argc, char* argv[]) {
             e.path = getPath(entry.path(), src);
             allFilesNow.push_back(e);
         }
-        cout << "Source directory scanned" << endl;
-        log << "Source directory scanned" << endl;
+        size = allFilesNow.size();
+        cout << "Source directory scanned: " << size << " file" << ((size == 1) ? "" : "s") << " found" << endl;
+        log << "Source directory scanned: " << size << " file" << ((size == 1) ? "" : "s") << " found" << endl;
         for(filesystem::directory_entry entry : filesystem::recursive_directory_iterator(dst)) {
             DirectoryEntry e;
             e.entry = entry;
             e.path = getPath(entry.path(), dst);
             allFilesBefore.push_back(e);
         }
-        cout << "Destination directory scanned, comparing the two lists..." << endl;
-        log << "Destination directory scanned, comparing the two lists..." << endl;
+        size = allFilesBefore.size();
+        cout << "Destination directory scanned: " << size << " file" << ((size == 1) ? "" : "s") << " found; comparing the two lists..." << endl;
+        log << "Destination directory scanned: " << size << " file" << ((size == 1) ? "" : "s") << " found; comparing the two lists..." << endl;
         //Files to copy
         size = allFilesNow.size();
         for(Uint32 i = 0; i < size; i++) {
@@ -154,6 +159,8 @@ int main(int argc, char* argv[]) {
         log << "Lists compared, starting copy-delete operation..." << endl;
         //Copy files
         size = toCopyFiles.size();
+        cout << size << " file" << ((size == 1) ? "" : "s") << " to copy" << endl;
+        log << size << " file" << ((size == 1) ? "" : "s") << " to copy" << endl;
         for(Uint32 i = 0; i < size; i++) {
             DirectoryEntry e = toCopyFiles[i];
             if(e.entry.is_directory()) { //Copy directory
@@ -193,6 +200,8 @@ int main(int argc, char* argv[]) {
         }
         //Remove files
         size = toRemoveFiles.size();
+        cout << size << " file" << ((size == 1) ? "" : "s") << " to remove" << endl;
+        log << size << " file" << ((size == 1) ? "" : "s") << " to remove" << endl;
         for(Uint32 i = 0; i < size; i++) {
             DirectoryEntry e = toRemoveFiles[i];
             filesystem::path rmvPath(rmv + dirSep + e.path);
@@ -217,8 +226,8 @@ int main(int argc, char* argv[]) {
                 }
             }
             if(!fError) {
-                log << "\tRemoved file: " << e.path << endl;
-                cout << "\tRemoved file: " << e.path << endl;
+                log << "\tRemoved " << ((e.entry.is_directory()) ? "folder" : "file") << ": " << e.path << endl;
+                cout << "\tRemoved " << ((e.entry.is_directory()) ? "folder" : "file") << ": " << e.path << endl;
                 rmvdFiles++;
             }
         }

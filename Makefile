@@ -1,7 +1,7 @@
 .RECIPEPREFIX = >
 CC = g++
 NAME = backup-utility
-VERSION = 0.1.0
+VERSION = 1.0.0
 64OPTIONS = -std=c++2a -m64 -lstdc++fs -o
 32OPTIONS = -std=c++2a -m32 -lstdc++fs -o
 DEBUGOPTIONS = -g
