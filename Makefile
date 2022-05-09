@@ -54,29 +54,16 @@ release-win-32:
 
 #debug-64
 build:
-> $(CC) src/main.cpp $(DEBUGOPTIONS) $(64OPTIONS) bin/debug/$(NAME)-$(VERSION)-x64
+> $(CC) src/main.cpp $(DEBUGOPTIONS) $(64OPTIONS) bin/debug/debug
 
 run:
-> ./bin/debug/$(NAME)-$(VERSION)-x64 $(RUNOPTIONS) --unix
+> ./bin/debug/debug $(RUNOPTIONS) --unix
 
 build-win:
-> $(CC) src/main.cpp $(DEBUGOPTIONS) $(64OPTIONS) bin/debug/$(NAME)-$(VERSION)-x64.exe
+> $(CC) src/main.cpp $(DEBUGOPTIONS) $(64OPTIONS) bin/debug/debug.exe
 
 run-win:
-> ./bin/debug/$(NAME)-$(VERSION)-x64.exe $(RUNOPTIONS)
-
-#debug-32
-build-23:
-> $(CC) src/main.cpp $(DEBUGOPTIONS) $(32OPTIONS) bin/debug/$(NAME)-$(VERSION)-x32
-
-run-32:
-> ./bin/debug/$(NAME)-$(VERSION)-x32 $(RUNOPTIONS) --unix
-
-build-win-32:
-> $(CC) src/main.cpp $(DEBUGOPTIONS) $(32OPTIONS) bin/debug/$(NAME)-$(VERSION)-x32.exe
-
-run-win-32:
-> ./bin/debug/$(NAME)-$(VERSION)-x32.exe $(RUNOPTIONS)
+> ./bin/debugdebug.exe $(RUNOPTIONS)
 
 #release-64
 build-release:

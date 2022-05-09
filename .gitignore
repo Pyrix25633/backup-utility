@@ -1,5 +1,7 @@
-bin/
+bin/debug/*
+bin/release/*
 *.o
 test/
 log.txt
-extensions.txt
+*.sh
+*.ps1
