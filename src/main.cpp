@@ -223,14 +223,42 @@ int main(int argc, char* argv[]) {
         log << size << " file" << ((size == 1) ? "" : "s") << " to remove" << endl;
         for(Uint32 i = 0; i < size; i++) {
             DirectoryEntry e = toRemoveFiles[i];
-            filesystem::path rmvPath(rmv + dirSep + e.path);
-            try {
-                filesystem::rename(e.entry.path(), rmvPath);
-                fError = false;
-            }
-            catch(exception ex) {
+            if(!e.entry.is_directory()) {
+                filesystem::path rmvPath(rmv + dirSep + e.path);
                 try {
-                    filesystem::remove(rmvPath);
+                    filesystem::rename(e.entry.path(), rmvPath);
+                    fError = false;
+                }
+                catch(exception ex) {
+                    try {
+                        filesystem::remove(rmvPath);
+                        filesystem::rename(e.entry.path(), rmvPath);
+                        fError = false;
+                    }
+                    catch(exception ex) {
+                        try {
+                            filesystem::path dirPath(getDirectory(rmv + dirSep + e.path));
+                            filesystem::create_directories(dirPath);
+                            filesystem::rename(e.entry.path(), rmvPath);
+                            fError = false;
+                        }
+                        catch(exception ex) {fError = true;}
+                    }
+                }
+                if(!fError) {
+                    log << "\tRemoved file: " << e.path << endl;
+                    cout << "\tRemoved file: " << e.path << endl;
+                    rmvdFiles++;
+                }
+            }
+        }
+        //Remove folders
+        size = toRemoveFiles.size();
+        for(Uint32 i = 0; i < size; i++) {
+            DirectoryEntry e = toRemoveFiles[i];
+            if(e.entry.is_directory()) {
+                filesystem::path rmvPath(rmv + dirSep + e.path);
+                try {
                     filesystem::rename(e.entry.path(), rmvPath);
                     fError = false;
                 }
@@ -241,13 +269,19 @@ int main(int argc, char* argv[]) {
                         filesystem::rename(e.entry.path(), rmvPath);
                         fError = false;
                     }
-                    catch(exception ex) {fError = true;}
+                    catch(exception ex) {
+                        try {
+                            filesystem::remove(e.entry.path());
+                            fError = false;
+                        }
+                        catch(exception ex) {fError = true;}
+                    }
                 }
-            }
-            if(!fError) {
-                log << "\tRemoved " << ((e.entry.is_directory()) ? "folder" : "file") << ": " << e.path << endl;
-                cout << "\tRemoved " << ((e.entry.is_directory()) ? "folder" : "file") << ": " << e.path << endl;
-                rmvdFiles++;
+                if(!fError) {
+                    log << "\tRemoved folder: " << e.path << endl;
+                    cout << "\tRemoved folder: " << e.path << endl;
+                    rmvdFiles++;
+                }
             }
         }
 
