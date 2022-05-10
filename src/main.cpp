@@ -31,6 +31,7 @@ string getPath(filesystem::path entryPath, string &from);
 string getDirectory(string path);
 bool compareFiles(filesystem::path path1, filesystem::path path2);
 bool isInExtensionsList(string path, vector<string> extensionsList);
+string getProgressBar(long int now, long int total);
 
 int main(int argc, char* argv[]) {
     ofstream log("log.txt");
@@ -41,8 +42,9 @@ int main(int argc, char* argv[]) {
     Uint32 size, pos, time = 0, cpdFiles = 0, rmvdFiles = 0;
     filesystem::copy_options copyOptions = filesystem::copy_options::overwrite_existing
         | filesystem::copy_options::recursive | filesystem::copy_options::directories_only;
-    string version = "1.0.0";
+    string version = "1.1.0";
     bool fError = false;
+    long int sizeNow, sizeToCopy;
 
     cout << "Backup Utility version " << version << endl;
 
@@ -123,25 +125,35 @@ int main(int argc, char* argv[]) {
         log << "Destination directory scanned: " << size << " file" << ((size == 1) ? "" : "s") << " found; comparing the two lists..." << endl;
         //Files to copy
         size = allFilesNow.size();
+        sizeToCopy = 0;
         for(Uint32 i = 0; i < size; i++) {
+            bool toCopy = false;
             DirectoryEntry e = allFilesNow[i];
             if(!search(e, allFilesBefore, pos)) {
                 toCopyFiles.push_back(e);
                 cout << "\tTo copy because not there: " << e.path << endl;
                 log << "\tTo copy because not there: " << e.path << endl;
+                toCopy = true;
             }
             else if(!e.entry.is_directory()) {
                 if(e.entry.file_size() != allFilesBefore[pos].entry.file_size()) {
                     toCopyFiles.push_back(e);
                     cout << "\tTo copy because different size: " << e.path << endl;
                     log << "\tTo copy because different size: " << e.path << endl;
+                    toCopy = true;
                 }
                 else if(isInExtensionsList(e.path, extensionsList)) {
                     if(!compareFiles(e.entry.path(), allFilesBefore[pos].entry.path())) {
                         toCopyFiles.push_back(e);
                         cout << "\tTo copy because different content: " << e.path << endl;
                         log << "\tTo copy because different content: " << e.path << endl;
+                        toCopy = true;
                     }
+                }
+            }
+            if(toCopy) {
+                if(!e.entry.is_directory()) {
+                    sizeToCopy += e.entry.file_size();
                 }
             }
         }
@@ -159,8 +171,10 @@ int main(int argc, char* argv[]) {
         log << "Lists compared, starting copy-delete operation..." << endl;
         //Copy files
         size = toCopyFiles.size();
+        sizeNow = 0;
         cout << size << " file" << ((size == 1) ? "" : "s") << " to copy" << endl;
         log << size << " file" << ((size == 1) ? "" : "s") << " to copy" << endl;
+        if(size > 0) cout << endl;
         for(Uint32 i = 0; i < size; i++) {
             DirectoryEntry e = toCopyFiles[i];
             if(e.entry.is_directory()) { //Copy directory
@@ -171,8 +185,10 @@ int main(int argc, char* argv[]) {
                 }
                 catch(exception ex) {fError = true;}
                 if(!fError) {
+                    cout << "\x1b[1A" << "\x1b[2K";
                     log << "\tCopied folder: " << e.path << endl;
                     cout << "\tCopied folder: " << e.path << endl;
+                    cout << getProgressBar(sizeNow, sizeToCopy) << endl;
                     cpdFiles++;
                 }
             }
@@ -192,8 +208,11 @@ int main(int argc, char* argv[]) {
                     
                 }
                 if(!fError) {
+                    sizeNow += e.entry.file_size();
+                    cout << "\x1b[1A" << "\x1b[2K";
                     log << "\tCopied file: " << e.path << endl;
                     cout << "\tCopied file: " << e.path << endl;
+                    cout << getProgressBar(sizeNow, sizeToCopy) << endl;
                     cpdFiles++;
                 }
             }
@@ -318,4 +337,22 @@ bool isInExtensionsList(string path, vector<string> extensionsList) {
         }
     }
     return false;
+}
+
+string getProgressBar(long int now, long int total) {
+    string s = "[";
+    int percent = float(now) / total * 100;
+
+    for(unsigned int i = 1; i <= 100; i++) {
+        if(i <= percent) {
+            s += "█";
+        }
+        else {
+            s += "-";
+        }
+    }
+
+    s += "] " + to_string(percent) + "%";
+
+    return s;
 }
