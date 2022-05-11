@@ -31,7 +31,7 @@ string getPath(filesystem::path entryPath, string &from);
 string getDirectory(string path);
 bool compareFiles(filesystem::path path1, filesystem::path path2);
 bool isInExtensionsList(string path, vector<string> extensionsList);
-string getProgressBar(long int now, long int total);
+string getProgressBar(Uint64 now, Uint64 total);
 
 int main(int argc, char* argv[]) {
     ofstream log("log.txt");
@@ -44,7 +44,7 @@ int main(int argc, char* argv[]) {
         | filesystem::copy_options::recursive | filesystem::copy_options::directories_only;
     string version = "1.1.0";
     bool fError = false;
-    long int sizeNow, sizeToCopy;
+    Uint64 sizeNow, sizeToCopy;
 
     cout << "Backup Utility version " << version << endl;
 
@@ -373,7 +373,7 @@ bool isInExtensionsList(string path, vector<string> extensionsList) {
     return false;
 }
 
-string getProgressBar(long int now, long int total) {
+string getProgressBar(Uint64 now, Uint64 total) {
     string s = "[";
     int percent = float(now) / total * 100;
 
