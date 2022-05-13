@@ -5,6 +5,7 @@
 #include <iterator>
 #include <algorithm>
 #include <unistd.h>
+#include <cmath>
 
 using namespace std;
 
@@ -31,7 +32,8 @@ string getPath(filesystem::path entryPath, string &from);
 string getDirectory(string path);
 bool compareFiles(filesystem::path path1, filesystem::path path2);
 bool isInExtensionsList(string path, vector<string> extensionsList);
-string getProgressBar(Uint64 now, Uint64 total);
+string getHumanReadableSize(Uint64 size);
+string getProgressBar(Uint64 now, Uint64 total, string totalString);
 
 int main(int argc, char* argv[]) {
     ofstream log("log.txt");
@@ -42,9 +44,10 @@ int main(int argc, char* argv[]) {
     Uint32 size, pos, time = 0, cpdFiles = 0, rmvdFiles = 0;
     filesystem::copy_options copyOptions = filesystem::copy_options::overwrite_existing
         | filesystem::copy_options::recursive | filesystem::copy_options::directories_only;
-    string version = "1.1.0";
+    string version = "1.2.0";
     bool fError = false;
-    Uint64 sizeNow, sizeToCopy;
+    Uint64 sizeNow, sizeToCopy, sizeToRemove;
+    string sizeToCopyString, sizeToRemoveString;
 
     cout << "Backup Utility version " << version << endl;
 
@@ -159,12 +162,14 @@ int main(int argc, char* argv[]) {
         }
         //Files to delete
         size = allFilesBefore.size();
+        sizeToRemove = 0;
         for(Uint32 i = 0; i < size; i++) {
             DirectoryEntry e = allFilesBefore[i];
             if(!search(e, allFilesNow, pos)) {
                 toRemoveFiles.push_back(e);
                 cout << "\tTo remove: " << e.path << endl;
                 log << "\tTo remove: " << e.path << endl;
+                if(!e.entry.is_directory()) sizeToRemove += e.entry.file_size();
             }
         }
         cout << "Lists compared, starting copy-delete operation..." << endl;
@@ -172,8 +177,9 @@ int main(int argc, char* argv[]) {
         //Copy files
         size = toCopyFiles.size();
         sizeNow = 0;
-        cout << size << " file" << ((size == 1) ? "" : "s") << " to copy" << endl;
-        log << size << " file" << ((size == 1) ? "" : "s") << " to copy" << endl;
+        sizeToCopyString = getHumanReadableSize(sizeToCopy);
+        cout << size << " file" << ((size == 1) ? "" : "s") << " to copy (" << sizeToCopyString << ")" << endl;
+        log << size << " file" << ((size == 1) ? "" : "s") << " to copy (" << sizeToCopyString << ")" << endl;
         if(size > 0) cout << endl;
         for(Uint32 i = 0; i < size; i++) {
             DirectoryEntry e = toCopyFiles[i];
@@ -188,7 +194,7 @@ int main(int argc, char* argv[]) {
                     cout << "\x1b[1A" << "\x1b[2K";
                     log << "\tCopied folder: " << e.path << endl;
                     cout << "\tCopied folder: " << e.path << endl;
-                    cout << getProgressBar(sizeNow, sizeToCopy) << endl;
+                    cout << getProgressBar(sizeNow, sizeToCopy, sizeToCopyString) << endl;
                     cpdFiles++;
                 }
             }
@@ -212,15 +218,16 @@ int main(int argc, char* argv[]) {
                     cout << "\x1b[1A" << "\x1b[2K";
                     log << "\tCopied file: " << e.path << endl;
                     cout << "\tCopied file: " << e.path << endl;
-                    cout << getProgressBar(sizeNow, sizeToCopy) << endl;
+                    cout << getProgressBar(sizeNow, sizeToCopy, sizeToCopyString) << endl;
                     cpdFiles++;
                 }
             }
         }
         //Remove files
         size = toRemoveFiles.size();
-        cout << size << " file" << ((size == 1) ? "" : "s") << " to remove" << endl;
-        log << size << " file" << ((size == 1) ? "" : "s") << " to remove" << endl;
+        sizeToRemoveString = getHumanReadableSize(sizeToRemove);
+        cout << size << " file" << ((size == 1) ? "" : "s") << " to remove (" << sizeToRemoveString << ")" << endl;
+        log << size << " file" << ((size == 1) ? "" : "s") << " to remove (" << sizeToRemoveString << ")" << endl;
         for(Uint32 i = 0; i < size; i++) {
             DirectoryEntry e = toRemoveFiles[i];
             if(!e.entry.is_directory()) {
@@ -285,11 +292,11 @@ int main(int argc, char* argv[]) {
             }
         }
 
-        cout << "Operation completed, " << cpdFiles << " file" << ((cpdFiles == 1) ? "" : "s") << " copied, "
-            << rmvdFiles << " file" << ((rmvdFiles == 1) ? "" : "s") << " removed"<< endl;
+        cout << "Operation completed, " << cpdFiles << " file" << ((cpdFiles == 1) ? "" : "s") << " copied (" << sizeToCopyString << "), "
+            << rmvdFiles << " file" << ((rmvdFiles == 1) ? "" : "s") << " removed (" << sizeToRemoveString << ")"<< endl;
         cout << "Waiting " << time << " seconds from now, process can be terminated with 'Ctrl + C' before the next scan" << endl;
-        log << "Operation completed, " << cpdFiles << " file" << ((cpdFiles == 1) ? "" : "s") << " copied, "
-            << rmvdFiles << " file" << ((rmvdFiles == 1) ? "" : "s") << " removed"<< endl;
+        log << "Operation completed, " << cpdFiles << " file" << ((cpdFiles == 1) ? "" : "s") << " copied (" << sizeToCopyString << "), "
+            << rmvdFiles << " file" << ((rmvdFiles == 1) ? "" : "s") << " removed (" << sizeToRemoveString << ")"<< endl;
 
         allFilesNow.clear();
         allFilesBefore.clear();
@@ -373,7 +380,27 @@ bool isInExtensionsList(string path, vector<string> extensionsList) {
     return false;
 }
 
-string getProgressBar(Uint64 now, Uint64 total) {
+string getHumanReadableSize(Uint64 size) {
+    Uint16 unit = 1024;
+    if(size < unit) {
+        return to_string(size) + "B";
+    }
+    Uint64 KiBytes = floor(float(size) / unit);
+    Uint16 Bytes = size % unit;
+    if(KiBytes < unit) {
+        return to_string(KiBytes) + "." + to_string(Bytes) + "KiB";
+    }
+    Uint32 MiBytes = floor(float(KiBytes) / unit);
+    KiBytes %= unit;
+    if(MiBytes < unit) {
+        return to_string(MiBytes) + "." + to_string(KiBytes) + "MiB";
+    }
+    Uint16 GiBytes = floor(float(MiBytes) / unit);
+    MiBytes %= unit;
+    return to_string(GiBytes) + "." + to_string(MiBytes) + "GiB";
+}
+
+string getProgressBar(Uint64 now, Uint64 total, string totalString) {
     string s = "[";
     int percent = float(now) / total * 100;
 
@@ -382,11 +409,11 @@ string getProgressBar(Uint64 now, Uint64 total) {
             s += "█";
         }
         else {
-            s += "-";
+            s += "░";
         }
     }
 
-    s += "] " + to_string(percent) + "%";
+    s += "] " + to_string(percent) + "% (" + getHumanReadableSize(now) + "/" + totalString + ")";
 
     return s;
 }
