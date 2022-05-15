@@ -26,6 +26,7 @@ struct DirectoryEntry {
 };
 
 char dirSep = '\\';
+string barFull = "#", barEmpty = "-", removeLine = "";
 
 bool search(DirectoryEntry &entry, vector<DirectoryEntry> &vector, Uint32 &pos);
 string getPath(filesystem::path entryPath, string &from);
@@ -44,7 +45,7 @@ int main(int argc, char* argv[]) {
     Uint32 size, pos, time = 0, cpdFiles = 0, rmvdFiles = 0;
     filesystem::copy_options copyOptions = filesystem::copy_options::overwrite_existing
         | filesystem::copy_options::recursive | filesystem::copy_options::directories_only;
-    string version = "1.2.0";
+    string version = "1.2.1";
     bool fError = false;
     Uint64 sizeNow, sizeToCopy, sizeToRemove;
     string sizeToCopyString, sizeToRemoveString;
@@ -75,6 +76,9 @@ int main(int argc, char* argv[]) {
         }
         else if(s == "--unix") {
             dirSep = '/';
+            barFull = "█";
+            barEmpty = "░";
+            removeLine = "\x1b[1A\x1b[2K";
             cout << "Unix directory separator" << endl;
         }
     }
@@ -191,7 +195,7 @@ int main(int argc, char* argv[]) {
                 }
                 catch(exception ex) {fError = true;}
                 if(!fError) {
-                    cout << "\x1b[1A" << "\x1b[2K";
+                    cout << removeLine;
                     log << "\tCopied folder: " << e.path << endl;
                     cout << "\tCopied folder: " << e.path << endl;
                     cout << getProgressBar(sizeNow, sizeToCopy, sizeToCopyString) << endl;
@@ -215,7 +219,7 @@ int main(int argc, char* argv[]) {
                 }
                 if(!fError) {
                     sizeNow += e.entry.file_size();
-                    cout << "\x1b[1A" << "\x1b[2K";
+                    cout << removeLine;
                     log << "\tCopied file: " << e.path << endl;
                     cout << "\tCopied file: " << e.path << endl;
                     cout << getProgressBar(sizeNow, sizeToCopy, sizeToCopyString) << endl;
@@ -406,10 +410,10 @@ string getProgressBar(Uint64 now, Uint64 total, string totalString) {
 
     for(unsigned int i = 1; i <= 100; i++) {
         if(i <= percent) {
-            s += "█";
+            s += barFull;
         }
         else {
-            s += "░";
+            s += barEmpty;
         }
     }
 
