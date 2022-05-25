@@ -45,12 +45,13 @@ int main(int argc, char* argv[]) {
     Uint32 size, pos, time = 0, cpdFiles = 0, rmvdFiles = 0;
     filesystem::copy_options copyOptions = filesystem::copy_options::overwrite_existing
         | filesystem::copy_options::recursive | filesystem::copy_options::directories_only;
-    string version = "1.2.1";
+    string version = "1.2.2";
     bool fError = false;
     Uint64 sizeNow, sizeToCopy, sizeToRemove;
     string sizeToCopyString, sizeToRemoveString;
 
     cout << "Backup Utility version " << version << endl;
+    cout << getHumanReadableSize(113600563) << endl;
 
     for(Uint8 i = 1; i < argc; i++) {
         string s = argv[i];
@@ -392,16 +393,16 @@ string getHumanReadableSize(Uint64 size) {
     Uint64 KiBytes = floor(float(size) / unit);
     Uint16 Bytes = size % unit;
     if(KiBytes < unit) {
-        return to_string(KiBytes) + "." + to_string(Bytes) + "KiB";
+        return to_string(KiBytes) + "KiB+" + to_string(Bytes) + "B";
     }
     Uint32 MiBytes = floor(float(KiBytes) / unit);
     KiBytes %= unit;
     if(MiBytes < unit) {
-        return to_string(MiBytes) + "." + to_string(KiBytes) + "MiB";
+        return to_string(MiBytes) + "MiB+" + to_string(KiBytes) + "KiB";
     }
     Uint16 GiBytes = floor(float(MiBytes) / unit);
     MiBytes %= unit;
-    return to_string(GiBytes) + "." + to_string(MiBytes) + "GiB";
+    return to_string(GiBytes) + "GiB+" + to_string(MiBytes) + "MiB";
 }
 
 string getProgressBar(Uint64 now, Uint64 total, string totalString) {
