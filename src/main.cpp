@@ -51,7 +51,6 @@ int main(int argc, char* argv[]) {
     string sizeToCopyString, sizeToRemoveString;
 
     cout << "Backup Utility version " << version << endl;
-    cout << getHumanReadableSize(113600563) << endl;
 
     for(Uint8 i = 1; i < argc; i++) {
         string s = argv[i];
