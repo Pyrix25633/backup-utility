@@ -2,8 +2,6 @@
 #include <fstream>
 #include <filesystem>
 #include <vector>
-#include <iterator>
-#include <algorithm>
 #include <unistd.h>
 #include <cmath>
 
@@ -28,7 +26,7 @@ struct DirectoryEntry {
 char dirSep = '\\';
 string barFull = "#", barEmpty = "-", removeLine = "";
 
-bool search(DirectoryEntry &entry, vector<DirectoryEntry> &vector, Uint32 &pos);
+bool isInDirectory(DirectoryEntry &entry, vector<DirectoryEntry> &vector, Uint64 &pos);
 string getPath(filesystem::path entryPath, string &from);
 string getDirectory(string path);
 bool compareFiles(filesystem::path path1, filesystem::path path2);
@@ -40,15 +38,15 @@ int main(int argc, char* argv[]) {
     ofstream log("log.txt");
     if(argc < 3) return 1;
     string src = "", dst = "", rmv = "", ext = "";
-    vector<DirectoryEntry> allFilesNow, allFilesBefore, toCopyFiles, toRemoveFiles;
+    vector<DirectoryEntry> allFilesNow, allFilesBefore, toCopyFiles, toRemoveFiles, toRemoveFolders;
     vector<string> extensionsList;
-    Uint32 size, pos, time = 0, cpdFiles = 0, rmvdFiles = 0;
+    Uint64 size, pos, time = 0, cpdFiles = 0, rmvdFiles = 0;
     filesystem::copy_options copyOptions = filesystem::copy_options::overwrite_existing
         | filesystem::copy_options::recursive | filesystem::copy_options::directories_only;
-    string version = "1.2.2";
+    string version = "1.3.0";
     bool fError = false;
-    Uint64 sizeNow, sizeToCopy, sizeToRemove;
-    string sizeToCopyString, sizeToRemoveString;
+    Uint64 sizeNow, sizeToCopy, sizeToRemove, sizeRemoved;
+    string sizeToCopyString, sizeToRemoveString, sizeCopiedString, sizeRemovedString, sizeDeltaString;
 
     cout << "Backup Utility version " << version << endl;
 
@@ -103,9 +101,14 @@ int main(int argc, char* argv[]) {
     if(ext != "") {
         ifstream extensionsFile(ext);
         char cs[20];
+        string ss;
+        Uint64 p;
         while(!extensionsFile.eof()) {
             extensionsFile.getline(cs, 20);
-            extensionsList.push_back(cs);
+            ss = cs;
+            p = ss.find('\r');
+            if(p != string::npos) ss = ss.replace(p, 1, "");
+            extensionsList.push_back(ss);
         }
     }
 
@@ -133,10 +136,10 @@ int main(int argc, char* argv[]) {
         //Files to copy
         size = allFilesNow.size();
         sizeToCopy = 0;
-        for(Uint32 i = 0; i < size; i++) {
+        for(Uint64 i = 0; i < size; i++) {
             bool toCopy = false;
             DirectoryEntry e = allFilesNow[i];
-            if(!search(e, allFilesBefore, pos)) {
+            if(!isInDirectory(e, allFilesBefore, pos)) {
                 toCopyFiles.push_back(e);
                 cout << "\tTo copy because not there: " << e.path << endl;
                 log << "\tTo copy because not there: " << e.path << endl;
@@ -167,13 +170,18 @@ int main(int argc, char* argv[]) {
         //Files to delete
         size = allFilesBefore.size();
         sizeToRemove = 0;
-        for(Uint32 i = 0; i < size; i++) {
+        for(Uint64 i = 0; i < size; i++) {
             DirectoryEntry e = allFilesBefore[i];
-            if(!search(e, allFilesNow, pos)) {
-                toRemoveFiles.push_back(e);
+            if(!isInDirectory(e, allFilesNow, pos)) {
                 cout << "\tTo remove: " << e.path << endl;
                 log << "\tTo remove: " << e.path << endl;
-                if(!e.entry.is_directory()) sizeToRemove += e.entry.file_size();
+                if(!e.entry.is_directory()) {
+                    toRemoveFiles.push_back(e);
+                    sizeToRemove += e.entry.file_size();
+                }
+                else {
+                    toRemoveFolders.push_back(e);
+                }
             }
         }
         cout << "Lists compared, starting copy-delete operation..." << endl;
@@ -185,7 +193,7 @@ int main(int argc, char* argv[]) {
         cout << size << " file" << ((size == 1) ? "" : "s") << " to copy (" << sizeToCopyString << ")" << endl;
         log << size << " file" << ((size == 1) ? "" : "s") << " to copy (" << sizeToCopyString << ")" << endl;
         if(size > 0) cout << endl;
-        for(Uint32 i = 0; i < size; i++) {
+        for(Uint64 i = 0; i < size; i++) {
             DirectoryEntry e = toCopyFiles[i];
             if(e.entry.is_directory()) { //Copy directory
                 filesystem::path dstPath(dst + dirSep + e.path);
@@ -228,48 +236,23 @@ int main(int argc, char* argv[]) {
             }
         }
         //Remove files
-        size = toRemoveFiles.size();
+        size = toRemoveFiles.size() + toRemoveFolders.size();
         sizeToRemoveString = getHumanReadableSize(sizeToRemove);
+        sizeRemoved = 0;
         cout << size << " file" << ((size == 1) ? "" : "s") << " to remove (" << sizeToRemoveString << ")" << endl;
         log << size << " file" << ((size == 1) ? "" : "s") << " to remove (" << sizeToRemoveString << ")" << endl;
-        for(Uint32 i = 0; i < size; i++) {
-            DirectoryEntry e = toRemoveFiles[i];
-            if(!e.entry.is_directory()) {
-                filesystem::path rmvPath(rmv + dirSep + e.path);
-                try {
-                    filesystem::rename(e.entry.path(), rmvPath);
-                    fError = false;
-                }
-                catch(exception ex) {
-                    try {
-                        filesystem::remove(rmvPath);
-                        filesystem::rename(e.entry.path(), rmvPath);
-                        fError = false;
-                    }
-                    catch(exception ex) {
-                        try {
-                            filesystem::path dirPath(getDirectory(rmv + dirSep + e.path));
-                            filesystem::create_directories(dirPath);
-                            filesystem::rename(e.entry.path(), rmvPath);
-                            fError = false;
-                        }
-                        catch(exception ex) {fError = true;}
-                    }
-                }
-                if(!fError) {
-                    log << "\tRemoved file: " << e.path << endl;
-                    cout << "\tRemoved file: " << e.path << endl;
-                    rmvdFiles++;
-                }
-            }
-        }
-        //Remove folders
         size = toRemoveFiles.size();
-        for(Uint32 i = 0; i < size; i++) {
+        for(Uint64 i = 0; i < size; i++) {
             DirectoryEntry e = toRemoveFiles[i];
-            if(e.entry.is_directory()) {
-                filesystem::path rmvPath(rmv + dirSep + e.path);
+            Uint64 fileSize = e.entry.file_size();
+            filesystem::path rmvPath(rmv + dirSep + e.path);
+            try {
+                filesystem::rename(e.entry.path(), rmvPath);
+                fError = false;
+            }
+            catch(exception ex) {
                 try {
+                    filesystem::remove(rmvPath);
                     filesystem::rename(e.entry.path(), rmvPath);
                     fError = false;
                 }
@@ -280,27 +263,57 @@ int main(int argc, char* argv[]) {
                         filesystem::rename(e.entry.path(), rmvPath);
                         fError = false;
                     }
-                    catch(exception ex) {
-                        try {
-                            filesystem::remove(e.entry.path());
-                            fError = false;
-                        }
-                        catch(exception ex) {fError = true;}
+                    catch(exception ex) {fError = true;}
+                }
+            }
+            if(!fError) {
+                log << "\tRemoved file: " << e.path << endl;
+                cout << "\tRemoved file: " << e.path << endl;
+                rmvdFiles++;
+                sizeRemoved += fileSize;
+            }
+        }
+        //Remove folders
+        size = toRemoveFolders.size();
+        for(Int64 i = size - 1; i >= 0; i--) {
+            DirectoryEntry e = toRemoveFolders[i];
+            filesystem::path rmvPath(rmv + dirSep + e.path);
+            try {
+                filesystem::rename(e.entry.path(), rmvPath);
+                fError = false;
+            }
+            catch(exception ex) {
+                try {
+                    filesystem::path dirPath(getDirectory(rmv + dirSep + e.path));
+                    filesystem::create_directories(dirPath);
+                    filesystem::rename(e.entry.path(), rmvPath);
+                    fError = false;
+                }
+                catch(exception ex) {
+                    try {
+                        filesystem::remove(e.entry.path());
+                        fError = false;
                     }
+                    catch(exception ex) {fError = true;}
                 }
-                if(!fError) {
-                    log << "\tRemoved folder: " << e.path << endl;
-                    cout << "\tRemoved folder: " << e.path << endl;
-                    rmvdFiles++;
-                }
+            }
+            if(!fError) {
+                log << "\tRemoved folder: " << e.path << endl;
+                cout << "\tRemoved folder: " << e.path << endl;
+                rmvdFiles++;
             }
         }
 
-        cout << "Operation completed, " << cpdFiles << " file" << ((cpdFiles == 1) ? "" : "s") << " copied (" << sizeToCopyString << "), "
-            << rmvdFiles << " file" << ((rmvdFiles == 1) ? "" : "s") << " removed (" << sizeToRemoveString << ")"<< endl;
+        sizeCopiedString = getHumanReadableSize(sizeNow);
+        sizeRemovedString = getHumanReadableSize(sizeRemoved);
+        sizeDeltaString = getHumanReadableSize(abs(Int64(sizeNow) - Int64(sizeRemoved)));
+        cout << "Operation completed, " << cpdFiles << " file" << ((cpdFiles == 1) ? "" : "s") << " copied (" << sizeCopiedString << "), "
+            << rmvdFiles << " file" << ((rmvdFiles == 1) ? "" : "s") << " removed (" << sizeRemovedString << ")"
+            << ", delta: " << ((sizeNow >= sizeRemoved) ? "+" : "-") << sizeDeltaString << endl;
         cout << "Waiting " << time << " seconds from now, process can be terminated with 'Ctrl + C' before the next scan" << endl;
-        log << "Operation completed, " << cpdFiles << " file" << ((cpdFiles == 1) ? "" : "s") << " copied (" << sizeToCopyString << "), "
-            << rmvdFiles << " file" << ((rmvdFiles == 1) ? "" : "s") << " removed (" << sizeToRemoveString << ")"<< endl;
+        log << "Operation completed, " << cpdFiles << " file" << ((cpdFiles == 1) ? "" : "s") << " copied (" << sizeCopiedString << "), "
+            << rmvdFiles << " file" << ((rmvdFiles == 1) ? "" : "s") << " removed (" << sizeRemovedString << ")"
+            << ", delta: " << ((sizeNow >= sizeRemoved) ? "+" : "-") << sizeDeltaString << endl;
 
         allFilesNow.clear();
         allFilesBefore.clear();
@@ -316,9 +329,9 @@ int main(int argc, char* argv[]) {
     return 0;
 }
 
-bool search(DirectoryEntry &entry, vector<DirectoryEntry> &vector, Uint32 &pos) {
-    Uint32 size = vector.size();
-    for(Uint32 i = 0; i < size; i++) {
+bool isInDirectory(DirectoryEntry &entry, vector<DirectoryEntry> &vector, Uint64 &pos) {
+    Uint64 size = vector.size();
+    for(Uint64 i = 0; i < size; i++) {
         if(entry.path == vector[i].path) {
             pos = i;
             return true;
